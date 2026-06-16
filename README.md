@@ -1,12 +1,15 @@
-# rust_agent
+# rust_claw
 
-基于 [adk-rust](https://crates.io/crates/adk-rust) 构建的 AI Agent 应用，采用 **DDD（领域驱动设计）分层架构** 组织代码，默认接入 DeepSeek 模型。
+基于 [axum](https://github.com/tokio-rs/axum) + [adk-rust](https://crates.io/crates/adk-rust) 构建的 AI Agent 后端服务，采用 **DDD（领域驱动设计）分层架构** 组织代码，默认接入 DeepSeek 模型。
 
 ## 技术栈
 
 - **语言**：Rust（edition 2024）
+- **Web 框架**：axum + tower-http（CORS / 日志中间件）
 - **Agent 框架**：adk-rust（启用 `deepseek` feature）
 - **异步运行时**：tokio
+- **序列化**：serde / serde_json
+- **日志**：tracing / tracing-subscriber
 - **配置**：dotenvy（从 `.env` 读取环境变量）
 
 ## 架构设计
@@ -24,7 +27,7 @@ interfaces  ──►  application  ──►  domain  ◄──  infrastructure
 
 ```
 src/
-├── main.rs                  # 二进制入口，启动 Agent
+├── main.rs                  # 二进制入口，启动 axum HTTP 服务
 ├── lib.rs                   # crate 根，声明各分层模块
 │
 ├── core/                    # 核心层：配置、环境变量、全局设置
@@ -53,13 +56,17 @@ src/
 
 ### 1. 准备环境变量
 
-复制示例文件并填入你的 DeepSeek API Key：
+复制示例文件并按需修改：
 
 ```bash
 cp .env.example .env
 ```
 
 ```env
+ENV=development
+LOG_LEVEL=info
+HOST=127.0.0.1
+PORT=8000
 DEEPSEEK_API_KEY=your-deepseek-api-key
 ```
 
@@ -73,5 +80,23 @@ cargo build
 
 ```bash
 cargo run
+```
+
+服务默认监听 `http://127.0.0.1:8000`。
+
+## API
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/status` | 系统健康检查 |
+
+健康检查响应示例：
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": [{ "service": "api", "status": "ok", "details": "" }]
+}
 ```
 
