@@ -4,4 +4,5 @@
 //! - `schemas`   请求/响应 DTO
 
 pub mod endpoints;
+pub mod errors;
 pub mod schemas;

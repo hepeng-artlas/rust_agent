@@ -1,6 +1,7 @@
 use anyhow::Result;
 use rust_claw::core::config::Settings;
 use rust_claw::interfaces::endpoints::create_router;
+use rust_claw::state::AppState;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
@@ -12,6 +13,9 @@ async fn main() -> Result<()> {
     let settings = Settings::from_env()?;
     init_logging(&settings.log_level);
 
+    let addr = settings.socket_addr()?;
+    let state = AppState::new(settings)?;
+
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -19,9 +23,9 @@ async fn main() -> Result<()> {
 
     let app = create_router()
         .layer(cors)
-        .layer(TraceLayer::new_for_http());
+        .layer(TraceLayer::new_for_http())
+        .with_state(state);
 
-    let addr = settings.socket_addr()?;
     tracing::info!("rust_claw backend listening on http://{addr}");
 
     let listener = tokio::net::TcpListener::bind(addr).await?;

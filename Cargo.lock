@@ -1483,6 +1483,7 @@ version = "0.1.0"
 dependencies = [
  "adk-rust",
  "anyhow",
+ "async-stream",
  "axum",
  "dotenvy",
  "serde",

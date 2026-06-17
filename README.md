@@ -8,6 +8,7 @@
 - **Web 框架**：axum + tower-http（CORS / 日志中间件）
 - **Agent 框架**：adk-rust（启用 `deepseek` feature）
 - **异步运行时**：tokio
+- **流式响应**：SSE（axum sse + async-stream）
 - **序列化**：serde / serde_json
 - **日志**：tracing / tracing-subscriber
 - **配置**：dotenvy（从 `.env` 读取环境变量）
@@ -52,6 +53,17 @@ src/
 
 > 当前为起步阶段的轻量骨架，随着功能扩展可在对应层内再拆分子模块（例如外部服务变多时，在 `infrastructure/external/` 下新增 `llm.rs`、`search.rs` 等）。
 
+## 功能进展
+
+以 adk-rust 为核心、保留 DDD 分层与统一 API 契约，已落地：
+
+- ✅ **健康检查**：`GET /api/status`
+- ✅ **会话管理（内存）**：基于 adk `InMemorySessionService`，对话上下文自动维护（重启即丢失）
+- ✅ **对话（非流式）**：`POST /api/sessions/{id}/chat`，一次性返回完整回复
+- ✅ **对话（SSE 流式）**：`POST /api/sessions/{id}/chat/stream`，实时下发文本增量
+
+> Agent 编排目前为最简单的单 LLM 智能体（DeepSeek）。规划/工具调用、持久化存储（SQLite/Postgres）、沙箱等能力将在后续里程碑接入。
+
 ## 快速开始
 
 ### 1. 准备环境变量
@@ -86,11 +98,16 @@ cargo run
 
 ## API
 
+所有接口统一前缀 `/api`，统一响应结构为 `{ code, msg, data }`（SSE 流式接口除外）。
+
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/status` | 系统健康检查 |
+| POST | `/api/sessions` | 创建一个新会话，返回 `session_id` |
+| POST | `/api/sessions/{session_id}/chat` | 向会话发起一次对话（非流式，返回完整回复） |
+| POST | `/api/sessions/{session_id}/chat/stream` | 向会话发起一次对话（SSE 流式） |
 
-健康检查响应示例：
+### 健康检查
 
 ```json
 {
@@ -98,5 +115,40 @@ cargo run
   "msg": "success",
   "data": [{ "service": "api", "status": "ok", "details": "" }]
 }
+```
+
+### 对话（非流式）
+
+请求体：`{ "message": "你好" }`，响应：
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": { "session_id": "<id>", "reply": "你好！有什么可以帮你的？" }
+}
+```
+
+### 对话（SSE 流式）
+
+请求体同上。响应为 SSE 事件流，事件信封为 `event: <type>`，`data` 为 JSON：
+
+| 事件 | 数据 | 说明 |
+|------|------|------|
+| `delta` | `{ "text": "<chunk>" }` | 增量文本块，用于实时打字机渲染 |
+| `message` | `{ "role": "assistant", "text": "<full>" }` | 一条完整的助手消息（权威值） |
+| `error` | `{ "error": "<reason>" }` | 出错事件 |
+| `done` | `{}` | 流结束标记 |
+
+示例（`curl -N` 关闭缓冲方可看到逐字输出）：
+
+```bash
+# 1) 创建会话
+curl -X POST http://127.0.0.1:8000/api/sessions
+
+# 2) 流式对话
+curl -N -X POST http://127.0.0.1:8000/api/sessions/<session_id>/chat/stream \
+  -H "Content-Type: application/json" \
+  -d '{"message":"用三句话介绍一下你自己"}'
 ```
 

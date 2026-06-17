@@ -1,3 +1,4 @@
 //! 应用层：编排领域对象完成具体用例，对外提供应用服务。不包含核心业务规则。
 
+pub mod errors;
 pub mod services;
